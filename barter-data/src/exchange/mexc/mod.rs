@@ -18,6 +18,7 @@ use barter_integration::{
 use barter_macro::{DeExchange, SerExchange};
 use derive_more::Display;
 use serde::Deserialize;
+use serde_json::json;
 use std::{borrow::Cow, time::Duration};
 use tokio::time;
 use url::Url;
@@ -74,7 +75,7 @@ impl Connector for Mexc {
     fn ping_interval() -> Option<PingInterval> {
         Some(PingInterval {
             interval: time::interval(Duration::from_secs(10)),
-            ping: || WsMessage::Text("ping".to_string().into()),
+            ping: || WsMessage::Text(json!({ "method": "ping" }).to_string().into()),
         })
     }
 
