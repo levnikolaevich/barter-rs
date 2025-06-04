@@ -75,7 +75,10 @@ impl Connector for Mexc {
     fn ping_interval() -> Option<PingInterval> {
         Some(PingInterval {
             interval: time::interval(Duration::from_secs(10)),
-            ping: || WsMessage::Text(json!({ "method": "ping" }).to_string().into()),
+            // MEXC expects an uppercase "PING" method per the API docs.
+            // Using lowercase may lead to the server closing the connection
+            // after ~30s of inactivity.
+            ping: || WsMessage::Text(json!({ "method": "PING" }).to_string().into()),
         })
     }
 
