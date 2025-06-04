@@ -1,8 +1,7 @@
 use self::{
     channel::MexcChannel,
     market::MexcMarket,
-    // MexcSubResponse removed as it's not used directly here after SubValidator change
-    subscription::{MexcWsSub, MexcWsMethod, MexcAggInterval}, // Keep MexcSubResponse for SubResponse type
+    subscription::{MexcAggInterval, MexcWsMethod, MexcWsSub},
 };
 use crate::{
     exchange::{Connector, ExchangeSub, PingInterval, StreamSelector}, instrument::InstrumentData, subscriber::{validator::WebSocketSubValidator, WebSocketSubscriber}, subscription::{trade::PublicTrades, Map}, transformer::stateless::StatelessTransformer, ExchangeWsStream, Identifier, NoInitialSnapshots
@@ -11,13 +10,11 @@ use barter_instrument::exchange::ExchangeId;
 use barter_integration::{error::SocketError, protocol::websocket::WsMessage, subscription::SubscriptionId};
 use barter_macro::{DeExchange, SerExchange};
 use derive_more::Display;
-// serde_json::json removed as it's not used
 use url::Url;
-use std::{borrow::Cow, time::Duration}; // marker::PhantomData removed
+use std::{borrow::Cow, time::Duration};
 use tokio::time;
 use serde::Deserialize;
 
-// Modules for MEXC connector
 pub mod channel;
 pub mod market;
 pub mod subscription;
@@ -49,8 +46,8 @@ impl Connector for Mexc {
     type Channel = MexcChannel;
     type Market = MexcMarket;
     type Subscriber = WebSocketSubscriber;
-    type SubValidator = WebSocketSubValidator; // Changed as per user request
-    type SubResponse = self::subscription::MexcSubResponse; // Still used for SubResponse type
+    type SubValidator = WebSocketSubValidator;
+    type SubResponse = self::subscription::MexcSubResponse;
 
     fn url() -> Result<Url, SocketError> {
         Url::parse(BASE_URL_MEXC).map_err(SocketError::UrlParse)
@@ -59,7 +56,7 @@ impl Connector for Mexc {
     fn ping_interval() -> Option<PingInterval> {
         Some(PingInterval {
             interval: time::interval(Duration::from_secs(10)),
-            ping: || WsMessage::Text("ping".to_string().into()), // .into() to convert String to Utf8Bytes
+            ping: || WsMessage::Text("ping".to_string().into()),
         })
     }
 
@@ -87,7 +84,7 @@ impl Connector for Mexc {
         };
 
         match serde_json::to_string(&subscription_message) {
-            Ok(text_payload) => vec![WsMessage::Text(text_payload.into())], // .into()
+            Ok(text_payload) => vec![WsMessage::Text(text_payload.into())],
             Err(e) => {
                 eprintln!("Failed to serialize MEXC subscription request: {}", e);
                 Vec::new()
@@ -96,15 +93,15 @@ impl Connector for Mexc {
     }
 
     fn expected_responses<InstrumentKey>(subscriptions: &Map<InstrumentKey>) -> usize {
-        subscriptions.0.len() // Assuming Map is a newtype wrapper around a HashMap/BTreeMap at field 0
+        subscriptions.0.len()
     }
 }
 
-// Placeholder Deserialize implementation for PushDataV3ApiWrapper to satisfy trait bounds.
-// TODO: Actual Protobuf deserialization should happen earlier in the pipeline (eg., in WebSocketParser or custom Subscriber).
-// This impl will likely cause runtime errors if invoked, as Protobuf messages are binary.
+// Stub `Deserialize` implementation to satisfy trait bounds.
+// MEXC V3 uses Protocol Buffers, so proper decoding should be handled
+// in the WebSocket layer rather than via Serde text deserialisation.
 impl<'de> Deserialize<'de> for self::trade::proto::PushDataV3ApiWrapper {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -117,11 +114,8 @@ impl<'de> Deserialize<'de> for self::trade::proto::PushDataV3ApiWrapper {
 
 impl Identifier<Option<SubscriptionId>> for self::trade::proto::PushDataV3ApiWrapper {
     fn id(&self) -> Option<SubscriptionId> {
-        // Attempt to construct SubscriptionId from the 'channel' field.
-        // The format of self.channel is like "spot@public.aggre.deals.v3.api.pb@100ms@BTC_USDT"
-        // We need to ensure this string can be directly used or transformed into a valid SubscriptionId.
-        // For now, let's assume the full channel string can serve as the SubscriptionId.
-        // This might need refinement based on how SubscriptionIds are structured and used elsewhere.
+        // Use the raw channel string as the subscription identifier.
+        // This may be adjusted once a dedicated Protobuf parser is implemented.
         Some(SubscriptionId::from(self.channel.as_str()))
     }
 }

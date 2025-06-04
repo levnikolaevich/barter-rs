@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 
 use crate::{
     event::{MarketEvent, MarketIter},
-    error::DataError, // Import DataError
+    error::DataError,
     subscription::trade::PublicTrade,
 };
 
@@ -21,7 +21,7 @@ fn mexc_trade_type_to_side(trade_type: i32) -> Result<Side, DataError> {
     match trade_type {
         1 => Ok(Side::Buy),
         2 => Ok(Side::Sell),
-        _ => Err(DataError::Socket(format!( // Expects String for DataError::Socket
+        _ => Err(DataError::Socket(format!(
             "Unsupported MexcTrade::Side: unknown trade_type: {}",
             trade_type
         ))),
@@ -30,7 +30,7 @@ fn mexc_trade_type_to_side(trade_type: i32) -> Result<Side, DataError> {
 
 /// Converts a millisecond Unix epoch timestamp (i64) to `DateTime<Utc>`.
 fn ms_epoch_to_datetime_utc(ms: i64) -> Result<DateTime<Utc>, DataError> {
-    if ms < 0 { // Added check for negative timestamps
+    if ms < 0 {
         return Err(DataError::Socket(format!(
             "Unsupported MexcTrade::Timestamp: invalid unix_epoch_ms (negative): {}",
             ms
@@ -198,10 +198,10 @@ mod tests {
         assert_eq!(ms_epoch_to_datetime_utc(timestamp_ms_valid), Ok(expected_datetime));
         
         let timestamp_ms_invalid = -1i64;
-        match ms_epoch_to_datetime_utc(timestamp_ms_invalid) { // Test with -1
-             Err(DataError::Socket(s)) => { 
+        match ms_epoch_to_datetime_utc(timestamp_ms_invalid) {
+            Err(DataError::Socket(s)) => {
                 assert!(s.contains("Unsupported MexcTrade::Timestamp"));
-                assert!(s.contains("invalid unix_epoch_ms (negative): -1")); // Updated error message check
+                assert!(s.contains("invalid unix_epoch_ms (negative): -1"));
             }
             other => panic!("Expected DataError::Socket(String) for negative timestamp, got {:?}", other),
         }
