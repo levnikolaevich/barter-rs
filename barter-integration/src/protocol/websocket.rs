@@ -73,14 +73,14 @@ where
     fn parse(input: Result<Self::Message, Self::Error>) -> Option<Result<Output, SocketError>> {
         match input {
             Ok(ws_message) => match ws_message {
-                WsMessage::Binary(binary) => Some(
-                    Output::decode(binary.clone()).map_err(|error| {
+                WsMessage::Binary(binary) => {
+                    Some(Output::decode(binary.clone()).map_err(|error| {
                         SocketError::DeserialiseProtobuf {
                             error,
                             payload: binary.to_vec(),
                         }
-                    }),
-                ),
+                    }))
+                }
                 WsMessage::Ping(ping) => process_ping::<Output>(ping),
                 WsMessage::Pong(pong) => process_pong::<Output>(pong),
                 WsMessage::Close(close_frame) => process_close_frame::<Output>(close_frame),

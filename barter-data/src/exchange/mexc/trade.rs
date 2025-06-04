@@ -1,9 +1,9 @@
-use barter_instrument::{exchange::ExchangeId, Side};
+use barter_instrument::{Side, exchange::ExchangeId};
 use chrono::{DateTime, Utc};
 
 use crate::{
-    event::{MarketEvent, MarketIter},
     error::DataError,
+    event::{MarketEvent, MarketIter},
     subscription::trade::PublicTrade,
 };
 
@@ -37,7 +37,7 @@ fn ms_epoch_to_datetime_utc(ms: i64) -> Result<DateTime<Utc>, DataError> {
         )));
     }
     DateTime::from_timestamp_millis(ms).ok_or_else(|| {
-        DataError::Socket(format!( 
+        DataError::Socket(format!(
             "Unsupported MexcTrade::Timestamp: invalid unix_epoch_ms: {}",
             ms
         ))
@@ -50,7 +50,11 @@ where
     InstrumentKey: Clone,
 {
     fn from(
-        (exchange_id, instrument, wrapper): (ExchangeId, InstrumentKey, proto::PushDataV3ApiWrapper),
+        (exchange_id, instrument, wrapper): (
+            ExchangeId,
+            InstrumentKey,
+            proto::PushDataV3ApiWrapper,
+        ),
     ) -> Self {
         let mut market_events = Vec::new();
         let time_received = Utc::now();
@@ -70,7 +74,7 @@ where
                 }
                 proto::push_data_v3_api_wrapper::Body::PublicAggreDeals(aggre_deals_api) => {
                     for deal_item in aggre_deals_api.deals {
-                         let result = map_public_aggre_deals_item_to_market_event(
+                        let result = map_public_aggre_deals_item_to_market_event(
                             exchange_id,
                             instrument.clone(),
                             &deal_item,
@@ -94,13 +98,13 @@ fn map_public_deals_item_to_market_event<InstrumentKey: Clone>(
     time_received: DateTime<Utc>,
 ) -> Result<MarketEvent<InstrumentKey, PublicTrade>, DataError> {
     let price = deal_item.price.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!( 
+        DataError::Socket(format!(
             "Failed to parse price from MEXC deal: '{}', error: {}",
             deal_item.price, e
         ))
     })?;
     let amount = deal_item.quantity.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!( 
+        DataError::Socket(format!(
             "Failed to parse quantity from MEXC deal: '{}', error: {}",
             deal_item.quantity, e
         ))
@@ -130,13 +134,13 @@ fn map_public_aggre_deals_item_to_market_event<InstrumentKey: Clone>(
     time_received: DateTime<Utc>,
 ) -> Result<MarketEvent<InstrumentKey, PublicTrade>, DataError> {
     let price = deal_item.price.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!( 
+        DataError::Socket(format!(
             "Failed to parse price from MEXC aggregated deal: '{}', error: {}",
             deal_item.price, e
         ))
     })?;
     let amount = deal_item.quantity.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!( 
+        DataError::Socket(format!(
             "Failed to parse quantity from MEXC aggregated deal: '{}', error: {}",
             deal_item.quantity, e
         ))
@@ -162,9 +166,9 @@ fn map_public_aggre_deals_item_to_market_event<InstrumentKey: Clone>(
 mod tests {
     use super::*;
     use crate::Identifier;
-    use serde::{Serialize, Deserialize};
-    use std::time::Duration;
     use barter_integration::de::datetime_utc_from_epoch_duration;
+    use serde::{Deserialize, Serialize};
+    use std::time::Duration;
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     struct TestInstrument {
@@ -183,7 +187,7 @@ mod tests {
         assert_eq!(mexc_trade_type_to_side(1), Ok(Side::Buy));
         assert_eq!(mexc_trade_type_to_side(2), Ok(Side::Sell));
         match mexc_trade_type_to_side(0) {
-            Err(DataError::Socket(s)) => { 
+            Err(DataError::Socket(s)) => {
                 assert!(s.contains("Unsupported MexcTrade::Side"));
                 assert!(s.contains("unknown trade_type: 0"));
             }
@@ -194,16 +198,23 @@ mod tests {
     #[test]
     fn test_ms_epoch_to_datetime_utc_conversion() {
         let timestamp_ms_valid = 1609459200000i64;
-        let expected_datetime = datetime_utc_from_epoch_duration(Duration::from_millis(timestamp_ms_valid as u64));
-        assert_eq!(ms_epoch_to_datetime_utc(timestamp_ms_valid), Ok(expected_datetime));
-        
+        let expected_datetime =
+            datetime_utc_from_epoch_duration(Duration::from_millis(timestamp_ms_valid as u64));
+        assert_eq!(
+            ms_epoch_to_datetime_utc(timestamp_ms_valid),
+            Ok(expected_datetime)
+        );
+
         let timestamp_ms_invalid = -1i64;
         match ms_epoch_to_datetime_utc(timestamp_ms_invalid) {
             Err(DataError::Socket(s)) => {
                 assert!(s.contains("Unsupported MexcTrade::Timestamp"));
                 assert!(s.contains("invalid unix_epoch_ms (negative): -1"));
             }
-            other => panic!("Expected DataError::Socket(String) for negative timestamp, got {:?}", other),
+            other => panic!(
+                "Expected DataError::Socket(String) for negative timestamp, got {:?}",
+                other
+            ),
         }
 
         // Test with a large value that might fail parsing if not handled by from_timestamp_millis
@@ -222,7 +233,10 @@ mod tests {
             time: 1609459200123,
         };
 
-        let instrument = TestInstrument { base: "BTC".into(), quote: "USDT".into() };
+        let instrument = TestInstrument {
+            base: "BTC".into(),
+            quote: "USDT".into(),
+        };
         let time_received = Utc::now();
 
         let event = map_public_aggre_deals_item_to_market_event(
@@ -230,7 +244,8 @@ mod tests {
             instrument.clone(),
             &deal_item,
             time_received,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(event.exchange, ExchangeId::Mexc);
         assert_eq!(event.instrument.id(), "BTC_USDT".to_string());
@@ -249,7 +264,7 @@ mod tests {
             &deal_item_bad_price,
             time_received,
         );
-        assert!(matches!(result_bad_price, Err(DataError::Socket(_)))); 
+        assert!(matches!(result_bad_price, Err(DataError::Socket(_))));
         if let Err(DataError::Socket(s)) = result_bad_price {
             assert!(s.contains("Failed to parse price"));
         }
@@ -267,15 +282,18 @@ mod tests {
             &deal_item_bad_quantity,
             time_received,
         );
-        assert!(matches!(result_bad_quantity, Err(DataError::Socket(_)))); 
-         if let Err(DataError::Socket(s)) = result_bad_quantity {
+        assert!(matches!(result_bad_quantity, Err(DataError::Socket(_))));
+        if let Err(DataError::Socket(s)) = result_bad_quantity {
             assert!(s.contains("Failed to parse quantity"));
         }
     }
 
-     #[test]
+    #[test]
     fn test_transform_push_data_v3_api_wrapper_public_aggre_deals() {
-        let instrument = TestInstrument { base: "ETH".into(), quote: "USDT".into() };
+        let instrument = TestInstrument {
+            base: "ETH".into(),
+            quote: "USDT".into(),
+        };
         let deal_item1 = proto::PublicAggreDealsV3ApiItem {
             price: "3000.1".to_string(),
             quantity: "0.1".to_string(),
@@ -299,12 +317,20 @@ mod tests {
                 proto::PublicAggreDealsV3Api {
                     deals: vec![deal_item1.clone(), deal_item2.clone()],
                     event_type: "DEALS".to_string(),
-                }
+                },
             )),
         };
 
-        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((ExchangeId::Mexc, instrument.clone(), wrapper));
-        let events: Vec<_> = market_iter.0.into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((
+            ExchangeId::Mexc,
+            instrument.clone(),
+            wrapper,
+        ));
+        let events: Vec<_> = market_iter
+            .0
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].kind.side, Side::Sell);
@@ -313,14 +339,17 @@ mod tests {
 
     #[test]
     fn test_transform_push_data_v3_api_wrapper_public_deals() {
-        let instrument = TestInstrument { base: "LTC".into(), quote: "USDT".into() };
+        let instrument = TestInstrument {
+            base: "LTC".into(),
+            quote: "USDT".into(),
+        };
         let deal_item = proto::PublicDealsV3ApiItem {
             price: "150.5".to_string(),
             quantity: "1.2".to_string(),
             trade_type: 1, // Buy
             time: 1609459400000,
         };
-         let wrapper = proto::PushDataV3ApiWrapper {
+        let wrapper = proto::PushDataV3ApiWrapper {
             channel: "spot@public.deals.v3.api.pb@LTC_USDT".to_string(),
             symbol: Some("LTC_USDT".to_string()),
             symbol_id: Some("LTC_USDT_ID".to_string()),
@@ -330,12 +359,20 @@ mod tests {
                 proto::PublicDealsV3Api {
                     deals: vec![deal_item.clone()],
                     event_type: "DEALS".to_string(),
-                }
+                },
             )),
         };
 
-        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((ExchangeId::Mexc, instrument.clone(), wrapper));
-        let events: Vec<_> = market_iter.0.into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((
+            ExchangeId::Mexc,
+            instrument.clone(),
+            wrapper,
+        ));
+        let events: Vec<_> = market_iter
+            .0
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].kind.price, 150.5);
@@ -343,7 +380,10 @@ mod tests {
 
     #[test]
     fn test_transform_push_data_v3_api_wrapper_no_body() {
-        let instrument = TestInstrument { base: "BTC".into(), quote: "USDT".into() };
+        let instrument = TestInstrument {
+            base: "BTC".into(),
+            quote: "USDT".into(),
+        };
         let wrapper = proto::PushDataV3ApiWrapper {
             channel: "some_channel".to_string(),
             symbol: Some("BTC_USDT".to_string()),
@@ -352,14 +392,25 @@ mod tests {
             send_time: Some(1609459200000),
             body: None,
         };
-        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((ExchangeId::Mexc, instrument, wrapper));
-        let events: Vec<_> = market_iter.0.into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((
+            ExchangeId::Mexc,
+            instrument,
+            wrapper,
+        ));
+        let events: Vec<_> = market_iter
+            .0
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         assert!(events.is_empty());
     }
 
     #[test]
     fn test_transform_push_data_v3_api_wrapper_other_body_type() {
-        let instrument = TestInstrument { base: "BTC".into(), quote: "USDT".into() };
+        let instrument = TestInstrument {
+            base: "BTC".into(),
+            quote: "USDT".into(),
+        };
         let kline_item = proto::PublicSpotKlineV3Api {
             interval: "Min1".to_string(),
             window_start: 1609459200,
@@ -377,11 +428,21 @@ mod tests {
             symbol_id: Some("BTC_USDT_ID".to_string()),
             create_time: Some(1609459260000),
             send_time: Some(1609459260000),
-            body: Some(proto::push_data_v3_api_wrapper::Body::PublicSpotKline(kline_item)),
+            body: Some(proto::push_data_v3_api_wrapper::Body::PublicSpotKline(
+                kline_item,
+            )),
         };
 
-        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((ExchangeId::Mexc, instrument, wrapper));
-        let events: Vec<_> = market_iter.0.into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((
+            ExchangeId::Mexc,
+            instrument,
+            wrapper,
+        ));
+        let events: Vec<_> = market_iter
+            .0
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         assert!(events.is_empty());
     }
 }

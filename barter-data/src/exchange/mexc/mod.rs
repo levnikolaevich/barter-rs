@@ -4,16 +4,23 @@ use self::{
     subscription::{MexcAggInterval, MexcWsMethod, MexcWsSub},
 };
 use crate::{
-    exchange::{Connector, ExchangeSub, PingInterval, StreamSelector}, instrument::InstrumentData, subscriber::{validator::WebSocketSubValidator, WebSocketSubscriber}, subscription::{trade::PublicTrades, Map}, transformer::stateless::StatelessTransformer, ExchangeWsStream, Identifier, NoInitialSnapshots
+    ExchangeWsStream, Identifier, NoInitialSnapshots,
+    exchange::{Connector, ExchangeSub, PingInterval, StreamSelector},
+    instrument::InstrumentData,
+    subscriber::{WebSocketSubscriber, validator::WebSocketSubValidator},
+    subscription::{Map, trade::PublicTrades},
+    transformer::stateless::StatelessTransformer,
 };
 use barter_instrument::exchange::ExchangeId;
-use barter_integration::{error::SocketError, protocol::websocket::WsMessage, subscription::SubscriptionId};
+use barter_integration::{
+    error::SocketError, protocol::websocket::WsMessage, subscription::SubscriptionId,
+};
 use barter_macro::{DeExchange, SerExchange};
 use derive_more::Display;
-use url::Url;
+use serde::Deserialize;
 use std::{borrow::Cow, time::Duration};
 use tokio::time;
-use serde::Deserialize;
+use url::Url;
 
 pub mod channel;
 pub mod market;
@@ -28,7 +35,18 @@ pub const BASE_URL_MEXC: &str = "wss://wbs.mexc.com/ws";
 ///
 /// MEXC uses Protocol Buffers for its V3 WebSocket API for public data streams like trades.
 #[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Display, DeExchange, SerExchange,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Debug,
+    Default,
+    Display,
+    DeExchange,
+    SerExchange,
 )]
 pub struct Mexc;
 
@@ -71,9 +89,9 @@ impl Connector for Mexc {
             .map(|sub| {
                 format!(
                     "{}@{}@{}",
-                    sub.channel.0, 
-                    Self::agg_interval_to_str(default_interval), 
-                    sub.market.0  
+                    sub.channel.0,
+                    Self::agg_interval_to_str(default_interval),
+                    sub.market.0
                 )
             })
             .collect::<Vec<String>>();
@@ -107,7 +125,7 @@ impl<'de> Deserialize<'de> for self::trade::proto::PushDataV3ApiWrapper {
     {
         Err(serde::de::Error::custom(
             "Attempted to Deserialize PushDataV3ApiWrapper with Serde text deserializer. \
-            MEXC V3 uses Protobuf binary format. Implement proper Protobuf deserialization in the WebSocket handling layer."
+            MEXC V3 uses Protobuf binary format. Implement proper Protobuf deserialization in the WebSocket handling layer.",
         ))
     }
 }
@@ -120,13 +138,17 @@ impl Identifier<Option<SubscriptionId>> for self::trade::proto::PushDataV3ApiWra
     }
 }
 
-
 impl<Instrument> StreamSelector<Instrument, PublicTrades> for Mexc
 where
     Instrument: InstrumentData,
 {
-    type SnapFetcher = NoInitialSnapshots; 
+    type SnapFetcher = NoInitialSnapshots;
     type Stream = ExchangeWsStream<
-        StatelessTransformer<Self, Instrument::Key, PublicTrades, self::trade::proto::PushDataV3ApiWrapper>,
+        StatelessTransformer<
+            Self,
+            Instrument::Key,
+            PublicTrades,
+            self::trade::proto::PushDataV3ApiWrapper,
+        >,
     >;
 }

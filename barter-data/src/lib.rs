@@ -115,11 +115,11 @@ use futures::{SinkExt, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 
 // Silence unused dev-dependencies warnings.
-#[cfg(test)]
-use tracing_subscriber as _;
 use std::{collections::VecDeque, future::Future};
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
+#[cfg(test)]
+use tracing_subscriber as _;
 
 /// All [`Error`](std::error::Error)s generated in Barter-Data.
 pub mod error;

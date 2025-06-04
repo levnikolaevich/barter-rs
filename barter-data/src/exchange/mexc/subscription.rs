@@ -1,4 +1,4 @@
-use barter_integration::{error::SocketError, Validator};
+use barter_integration::{Validator, error::SocketError};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
@@ -230,7 +230,9 @@ mod tests {
                     id: None,
                 },
                 expected_is_ok: false,
-                expected_error_msg: Some("Subscription/Unsubscription failed with code 1: Invalid topic".to_string()),
+                expected_error_msg: Some(
+                    "Subscription/Unsubscription failed with code 1: Invalid topic".to_string(),
+                ),
             },
             TestCase {
                 name: "TC4: Subscription failure (code 500, no msg)",
@@ -241,20 +243,39 @@ mod tests {
                     id: None,
                 },
                 expected_is_ok: false,
-                expected_error_msg: Some("Subscription/Unsubscription failed with code 500: No error detail provided".to_string()),
+                expected_error_msg: Some(
+                    "Subscription/Unsubscription failed with code 500: No error detail provided"
+                        .to_string(),
+                ),
             },
         ];
 
         for test in cases.into_iter() {
             let result = test.input_response.validate();
-            assert_eq!(result.is_ok(), test.expected_is_ok, "Test case '{}' failed: expected is_ok to be {}", test.name, test.expected_is_ok);
+            assert_eq!(
+                result.is_ok(),
+                test.expected_is_ok,
+                "Test case '{}' failed: expected is_ok to be {}",
+                test.name,
+                test.expected_is_ok
+            );
             if let Some(expected_msg) = test.expected_error_msg {
                 match result {
-                    Ok(_) => panic!("Test case '{}' failed: expected error but got Ok", test.name),
+                    Ok(_) => panic!(
+                        "Test case '{}' failed: expected error but got Ok",
+                        test.name
+                    ),
                     Err(SocketError::Subscribe(actual_msg)) => {
-                        assert_eq!(actual_msg, expected_msg, "Test case '{}' failed: error message mismatch", test.name);
+                        assert_eq!(
+                            actual_msg, expected_msg,
+                            "Test case '{}' failed: error message mismatch",
+                            test.name
+                        );
                     }
-                    Err(other_err) => panic!("Test case '{}' failed: unexpected error type {:?}", test.name, other_err),
+                    Err(other_err) => panic!(
+                        "Test case '{}' failed: unexpected error type {:?}",
+                        test.name, other_err
+                    ),
                 }
             }
         }
@@ -277,7 +298,9 @@ mod tests {
                     name: "TC0: Single subscription",
                     input: MexcWsSub {
                         method: MexcWsMethod::Subscription,
-                        params: Cow::Owned(vec!["spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".to_string()]),
+                        params: Cow::Owned(vec![
+                            "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".to_string(),
+                        ]),
                     },
                     expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT"]}"#,
                 },
@@ -296,7 +319,9 @@ mod tests {
                     name: "TC2: Unsubscription",
                     input: MexcWsSub {
                         method: MexcWsMethod::Unsubscription,
-                        params: Cow::Owned(vec!["spot@public.aggre.deals.v3.api.pb@100ms@LTCUSDT".to_string()]),
+                        params: Cow::Owned(vec![
+                            "spot@public.aggre.deals.v3.api.pb@100ms@LTCUSDT".to_string(),
+                        ]),
                     },
                     expected_json: r#"{"method":"UNSUBSCRIPTION","params":["spot@public.aggre.deals.v3.api.pb@100ms@LTCUSDT"]}"#,
                 },
@@ -304,14 +329,24 @@ mod tests {
 
             for test in cases.into_iter() {
                 let actual_json = serde_json::to_string(&test.input).expect("Failed to serialize");
-                assert_eq!(actual_json, test.expected_json, "Test case '{}' failed JSON serialization", test.name);
+                assert_eq!(
+                    actual_json, test.expected_json,
+                    "Test case '{}' failed JSON serialization",
+                    test.name
+                );
             }
         }
 
         #[test]
         fn test_mexc_agg_interval_serialization() {
-            assert_eq!(serde_json::to_string(&MexcAggInterval::Ms10).unwrap(), r#""10ms""#);
-            assert_eq!(serde_json::to_string(&MexcAggInterval::Ms100).unwrap(), r#""100ms""#);
+            assert_eq!(
+                serde_json::to_string(&MexcAggInterval::Ms10).unwrap(),
+                r#""10ms""#
+            );
+            assert_eq!(
+                serde_json::to_string(&MexcAggInterval::Ms100).unwrap(),
+                r#""100ms""#
+            );
         }
     }
 }

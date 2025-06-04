@@ -1,4 +1,4 @@
-use crate::{instrument::MarketInstrumentData, subscription::Subscription, Identifier};
+use crate::{Identifier, instrument::MarketInstrumentData, subscription::Subscription};
 
 use super::Mexc;
 use barter_instrument::{
@@ -47,4 +47,3 @@ impl AsRef<str> for MexcMarket {
 fn mexc_market(base: &AssetNameInternal, quote: &AssetNameInternal) -> MexcMarket {
     MexcMarket(format_smolstr!("{base}{quote}").to_uppercase_smolstr())
 }
-
