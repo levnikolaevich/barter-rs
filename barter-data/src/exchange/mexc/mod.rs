@@ -4,7 +4,7 @@ use self::{
     subscription::{MexcAggInterval, MexcWsMethod, MexcWsSub},
 };
 use crate::{
-    ExchangeWsStream, Identifier, NoInitialSnapshots,
+    ExchangeWsPbStream, Identifier, NoInitialSnapshots,
     exchange::{Connector, ExchangeSub, PingInterval, StreamSelector},
     instrument::InstrumentData,
     subscriber::{WebSocketSubscriber, validator::WebSocketSubValidator},
@@ -143,7 +143,7 @@ where
     Instrument: InstrumentData,
 {
     type SnapFetcher = NoInitialSnapshots;
-    type Stream = ExchangeWsStream<
+    type Stream = ExchangeWsPbStream<
         StatelessTransformer<
             Self,
             Instrument::Key,
