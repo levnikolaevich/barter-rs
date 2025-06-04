@@ -18,6 +18,7 @@
 //! * **Easy**: Barter-Data's simple [`StreamBuilder`](streams::builder::StreamBuilder) and [`DynamicStreams`](streams::builder::dynamic::DynamicStreams) interface allows for easy & quick setup (see example below and /examples!).
 //! * **Normalised**: Barter-Data's unified interface for consuming public WebSocket data means every Exchange returns a normalised data model.
 //! * **Real-Time**: Barter-Data utilises real-time WebSocket integrations enabling the consumption of normalised tick-by-tick data.
+
 //! * **Extensible**: Barter-Data is highly extensible, and therefore easy to contribute to with coding new integrations!
 //!
 //! ## User API
@@ -111,6 +112,11 @@ use barter_integration::{
     stream::ExchangeStream,
 };
 use futures::{SinkExt, Stream, StreamExt};
+use serde::de::DeserializeOwned;
+
+// Silence unused dev-dependencies warnings.
+#[cfg(test)]
+use tracing_subscriber as _;
 use std::{collections::VecDeque, future::Future};
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
@@ -220,6 +226,7 @@ where
     Kind: SubscriptionKind + Send + Sync,
     Transformer: ExchangeTransformer<Exchange, Instrument::Key, Kind> + Send,
     Kind::Event: Send,
+    Transformer::Input: DeserializeOwned,
 {
     async fn init<SnapFetcher>(
         subscriptions: &[Subscription<Exchange, Instrument, Kind>],
@@ -301,13 +308,14 @@ pub fn process_buffered_events<Protocol, StreamTransformer>(
     events: Vec<Protocol::Message>,
 ) -> VecDeque<Result<StreamTransformer::Output, StreamTransformer::Error>>
 where
-    Protocol: StreamParser,
+    Protocol: StreamParser<StreamTransformer::Input>,
     StreamTransformer: Transformer,
+    StreamTransformer::Input: DeserializeOwned,
 {
     events
         .into_iter()
         .filter_map(|event| {
-            Protocol::parse::<StreamTransformer::Input>(Ok(event))?
+            Protocol::parse(Ok(event))?
                 .inspect_err(|error| {
                     warn!(
                         ?error,
