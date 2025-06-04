@@ -2,9 +2,6 @@ use barter_integration::{error::SocketError, Validator};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-// Note: MexcChannel would be imported from super::channels if this file were in the same module,
-// but subscription request generation is typically handled by the ExchangeChannel trait implementation.
-
 /// Defines the aggregation interval for the MEXC aggregated deals stream.
 ///
 /// Used when constructing the subscription topic string, e.g., "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".

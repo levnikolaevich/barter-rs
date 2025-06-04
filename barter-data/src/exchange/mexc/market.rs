@@ -7,10 +7,12 @@ use barter_instrument::{
 use serde::{Deserialize, Serialize};
 use smol_str::{SmolStr, StrExt, format_smolstr};
 
+/// Generated Protobuf types used by this connector.
 pub mod proto {
     include!("protobuf_gen/_.rs");
 }
 
+/// Wrapper around a market symbol, e.g. `BTCUSDT`.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Serialize)]
 pub struct MexcMarket(pub SmolStr);
 
@@ -45,3 +47,4 @@ impl AsRef<str> for MexcMarket {
 fn mexc_market(base: &AssetNameInternal, quote: &AssetNameInternal) -> MexcMarket {
     MexcMarket(format_smolstr!("{base}{quote}").to_uppercase_smolstr())
 }
+
