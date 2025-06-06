@@ -8,36 +8,35 @@ use serde::Serialize;
 /// Defines how to translate a Barter [`Subscription`] into an [`MexcChannel`]
 /// base string for WebSocket subscriptions.
 ///
-/// The actual subscription topic sent to MEXC for aggregated deals will be
+/// The actual subscription topic sent to MEXC for aggregated book ticker will be
 /// dynamically constructed by appending "@<interval>@<symbol>" to this base channel string.
-/// For example: "spot@public.aggre.deals.v3.api.pb@100ms@BTC_USDT".
+/// For example: "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".
 ///
 /// Important: This channel uses Protocol Buffers (.pb) for data format.
 ///
 /// MEXC WebSocket API (Spot V3) Documentation:
-/// - Trade Streams: <https://mexcdevelop.github.io/apidocs/spot_v3_en/#trade-streams>
-/// - Spot aggregated deals stream: Referenced within the "Trade Streams" section.
+/// - Individual symbol book ticker: <https://mexcdevelop.github.io/apidocs/spot_v3_en/#individual-symbol-book-ticker-streams>
 /// - Public Subscription Method: <https://mexcdevelop.github.io/apidocs/spot_v3_en/#public-subscription>
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize)]
 pub struct MexcChannel(pub &'static str);
 
 impl MexcChannel {
-    /// Base channel string for [`Mexc`]'s real-time public aggregated deals (trades)
+    /// Base channel string for [`Mexc`]'s real-time public aggregated book ticker
     /// stream using Protocol Buffers.
     ///
     /// The specific aggregation interval (e.g., "100ms") and market symbol
-    /// (e.g., "BTC_USDT") will be appended to this string (prefixed with "@")
+    /// (e.g., "BTCUSDT") will be appended to this string (prefixed with "@")
     /// when forming the actual subscription message.
     ///
-    /// Example base string: "spot@public.aggre.deals.v3.api.pb"
-    pub const AGGREGATED_TRADES_PB: Self = Self("spot@public.aggre.deals.v3.api.pb");
+    /// Example base string: "spot@public.aggre.bookTicker.v3.api.pb"
+    pub const AGGREGATED_BOOK_TICKER_PB: Self = Self("spot@public.aggre.bookTicker.v3.api.pb");
 }
 
 impl<Instrument> Identifier<MexcChannel> for Subscription<Mexc, Instrument, PublicTrades> {
     fn id(&self) -> MexcChannel {
-        // Default to using aggregated trades in Protobuf format.
+        // Default to using aggregated book ticker in Protobuf format.
         // The choice of interval (100ms/10ms) will be handled in the subscription logic.
-        MexcChannel::AGGREGATED_TRADES_PB
+        MexcChannel::AGGREGATED_BOOK_TICKER_PB
     }
 }
 
