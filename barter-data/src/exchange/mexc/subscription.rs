@@ -2,11 +2,11 @@ use barter_integration::{Validator, error::SocketError};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-/// Defines the aggregation interval for the MEXC aggregated deals stream.
+/// Defines the aggregation interval for the MEXC aggregated book ticker stream.
 ///
-/// Used when constructing the subscription topic string, e.g., "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".
+/// Used when constructing the subscription topic string, e.g., "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".
 ///
-/// See docs: <https://mexcdevelop.github.io/apidocs/spot_v3_en/#trade-streams> (Spot aggregated deals stream)
+/// See docs: <https://mexcdevelop.github.io/apidocs/spot_v3_en/#individual-symbol-book-ticker-streams>
 #[derive(Debug, Copy, Clone, Serialize, Default, Eq, PartialEq, Hash)]
 pub enum MexcAggInterval {
     /// 10ms aggregation interval.
@@ -47,7 +47,7 @@ pub struct MexcWsSub<'a> {
 /// {
 ///     "id": null,
 ///     "code": 0,
-///     "msg": "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT"
+///     "msg": "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT"
 /// }
 /// ```
 ///
@@ -56,8 +56,8 @@ pub struct MexcWsSub<'a> {
 /// {
 ///     "code": 0,
 ///     "data": [
-///         "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT",
-///         "spot@public.aggre.deals.v3.api.pb@100ms@ETHUSDT"
+///         "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT",
+///         "spot@public.aggre.bookTicker.v3.api.pb@100ms@ETHUSDT"
 ///     ]
 /// }
 /// ```
@@ -67,7 +67,7 @@ pub struct MexcWsSub<'a> {
 /// {
 ///     "id": null,
 ///     "code": 1,
-///     "msg": "Invalid topic spot@public.deals.v3.api@ABC"
+///     "msg": "Invalid topic spot@public.aggre.bookTicker.v3.api.pb@100ms@ABC"
 /// }
 /// ```
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -120,10 +120,12 @@ mod tests {
             let cases = vec![
                 TestCase {
                     // TC0: Single subscription success
-                    input: r#"{"id":null,"code":0,"msg":"spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT"}"#,
+                    input: r#"{"id":null,"code":0,"msg":"spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT"}"#,
                     expected: MexcSubResponse {
                         code: 0,
-                        detail: Some("spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".to_string()),
+                        detail: Some(
+                            "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".to_string(),
+                        ),
                         data: None,
                         // Adjusted to None to match observed deserialization behavior where JSON `null` becomes `Option::None`.
                         id: None,
@@ -132,23 +134,26 @@ mod tests {
                 TestCase {
                     // TC1: Multiple subscription success (structure based on general successful responses)
                     // ID field is missing in this input.
-                    input: r#"{"code":0,"data":["spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT","spot@public.aggre.deals.v3.api.pb@100ms@ETHUSDT"]}"#,
+                    input: r#"{"code":0,"data":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT","spot@public.aggre.bookTicker.v3.api.pb@100ms@ETHUSDT"]}"#,
                     expected: MexcSubResponse {
                         code: 0,
                         detail: None,
                         data: Some(vec![
-                            "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".to_string(),
-                            "spot@public.aggre.deals.v3.api.pb@100ms@ETHUSDT".to_string(),
+                            "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".to_string(),
+                            "spot@public.aggre.bookTicker.v3.api.pb@100ms@ETHUSDT".to_string(),
                         ]),
                         id: None, // Expect None when 'id' field is missing
                     },
                 },
                 TestCase {
                     // TC2: Subscription failure
-                    input: r#"{"id":null,"code":1,"msg":"Invalid topic spot@public.deals.v3.api@ABC"}"#,
+                    input: r#"{"id":null,"code":1,"msg":"Invalid topic spot@public.aggre.bookTicker.v3.api.pb@100ms@ABC"}"#,
                     expected: MexcSubResponse {
                         code: 1,
-                        detail: Some("Invalid topic spot@public.deals.v3.api@ABC".to_string()),
+                        detail: Some(
+                            "Invalid topic spot@public.aggre.bookTicker.v3.api.pb@100ms@ABC"
+                                .to_string(),
+                        ),
                         data: None,
                         // Adjusted to None to match observed deserialization behavior where JSON `null` becomes `Option::None`.
                         id: None,
@@ -190,7 +195,9 @@ mod tests {
                 name: "TC0: Subscription success (code 0, with msg)",
                 input_response: MexcSubResponse {
                     code: 0,
-                    detail: Some("spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".to_string()),
+                    detail: Some(
+                        "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".to_string(),
+                    ),
                     data: None,
                     // Assuming JSON `null` for id deserializes to None in this environment.
                     id: None,
@@ -299,31 +306,31 @@ mod tests {
                     input: MexcWsSub {
                         method: MexcWsMethod::Subscription,
                         params: Cow::Owned(vec![
-                            "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".to_string(),
+                            "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".to_string(),
                         ]),
                     },
-                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT"]}"#,
+                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT"]}"#,
                 },
                 TestCase {
                     name: "TC1: Multiple subscriptions",
                     input: MexcWsSub {
                         method: MexcWsMethod::Subscription,
                         params: Cow::Owned(vec![
-                            "spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT".to_string(),
-                            "spot@public.aggre.deals.v3.api.pb@10ms@ETHUSDT".to_string(),
+                            "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".to_string(),
+                            "spot@public.aggre.bookTicker.v3.api.pb@10ms@ETHUSDT".to_string(),
                         ]),
                     },
-                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.deals.v3.api.pb@100ms@BTCUSDT","spot@public.aggre.deals.v3.api.pb@10ms@ETHUSDT"]}"#,
+                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT","spot@public.aggre.bookTicker.v3.api.pb@10ms@ETHUSDT"]}"#,
                 },
                 TestCase {
                     name: "TC2: Unsubscription",
                     input: MexcWsSub {
                         method: MexcWsMethod::Unsubscription,
                         params: Cow::Owned(vec![
-                            "spot@public.aggre.deals.v3.api.pb@100ms@LTCUSDT".to_string(),
+                            "spot@public.aggre.bookTicker.v3.api.pb@100ms@LTCUSDT".to_string(),
                         ]),
                     },
-                    expected_json: r#"{"method":"UNSUBSCRIPTION","params":["spot@public.aggre.deals.v3.api.pb@100ms@LTCUSDT"]}"#,
+                    expected_json: r#"{"method":"UNSUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@LTCUSDT"]}"#,
                 },
             ];
 

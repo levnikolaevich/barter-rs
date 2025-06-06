@@ -14,20 +14,6 @@ pub mod proto {
     include!("protobuf_gen/_.rs");
 }
 
-/// Converts MEXC `trade_type` (i32) to Barter `Side`.
-/// - 1: Buy
-/// - 2: Sell
-fn mexc_trade_type_to_side(trade_type: i32) -> Result<Side, DataError> {
-    match trade_type {
-        1 => Ok(Side::Buy),
-        2 => Ok(Side::Sell),
-        _ => Err(DataError::Socket(format!(
-            "Unsupported MexcTrade::Side: unknown trade_type: {}",
-            trade_type
-        ))),
-    }
-}
-
 /// Converts a millisecond Unix epoch timestamp (i64) to `DateTime<Utc>`.
 fn ms_epoch_to_datetime_utc(ms: i64) -> Result<DateTime<Utc>, DataError> {
     if ms < 0 {
@@ -61,27 +47,21 @@ where
 
         if let Some(body) = wrapper.body {
             match body {
-                proto::push_data_v3_api_wrapper::Body::PublicDeals(deals_api) => {
-                    for deal_item in deals_api.deals {
-                        let result = map_public_deals_item_to_market_event(
-                            exchange_id,
-                            instrument.clone(),
-                            &deal_item,
-                            time_received,
-                        );
-                        market_events.push(result);
-                    }
-                }
-                proto::push_data_v3_api_wrapper::Body::PublicAggreDeals(aggre_deals_api) => {
-                    for deal_item in aggre_deals_api.deals {
-                        let result = map_public_aggre_deals_item_to_market_event(
-                            exchange_id,
-                            instrument.clone(),
-                            &deal_item,
-                            time_received,
-                        );
-                        market_events.push(result);
-                    }
+                proto::push_data_v3_api_wrapper::Body::PublicAggreBookTicker(book_ticker) => {
+                    let exchange_time = wrapper
+                        .send_time
+                        .or(wrapper.create_time)
+                        .and_then(|ms| ms_epoch_to_datetime_utc(ms).ok())
+                        .unwrap_or(time_received);
+
+                    let events = map_public_aggre_book_ticker_to_market_events(
+                        exchange_id,
+                        instrument.clone(),
+                        &book_ticker,
+                        exchange_time,
+                        time_received,
+                    );
+                    market_events.extend(events);
                 }
                 _ => {} // Other message types not handled here
             }
@@ -90,76 +70,45 @@ where
     }
 }
 
-// Helper function to map proto::PublicDealsV3ApiItem to MarketEvent<PublicTrade>
-fn map_public_deals_item_to_market_event<InstrumentKey: Clone>(
+// Helper function to map proto::PublicAggreBookTickerV3Api to two MarketEvent<PublicTrade> instances
+fn map_public_aggre_book_ticker_to_market_events<InstrumentKey: Clone>(
     exchange_id: ExchangeId,
     instrument: InstrumentKey,
-    deal_item: &proto::PublicDealsV3ApiItem,
+    ticker: &proto::PublicAggreBookTickerV3Api,
+    exchange_time: DateTime<Utc>,
     time_received: DateTime<Utc>,
-) -> Result<MarketEvent<InstrumentKey, PublicTrade>, DataError> {
-    let price = deal_item.price.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!(
-            "Failed to parse price from MEXC deal: '{}', error: {}",
-            deal_item.price, e
-        ))
-    })?;
-    let amount = deal_item.quantity.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!(
-            "Failed to parse quantity from MEXC deal: '{}', error: {}",
-            deal_item.quantity, e
-        ))
-    })?;
-    let side = mexc_trade_type_to_side(deal_item.trade_type)?;
-    let exchange_time = ms_epoch_to_datetime_utc(deal_item.time)?;
+) -> Vec<Result<MarketEvent<InstrumentKey, PublicTrade>, DataError>> {
+    let parse = |price: &str, qty: &str, side: Side| -> Result<_, DataError> {
+        let price = price.parse::<f64>().map_err(|e| {
+            DataError::Socket(format!(
+                "Failed to parse price from MEXC agg book ticker: '{}', error: {}",
+                price, e
+            ))
+        })?;
+        let amount = qty.parse::<f64>().map_err(|e| {
+            DataError::Socket(format!(
+                "Failed to parse quantity from MEXC agg book ticker: '{}', error: {}",
+                qty, e
+            ))
+        })?;
+        Ok(MarketEvent {
+            time_exchange: exchange_time,
+            time_received,
+            exchange: exchange_id,
+            instrument: instrument.clone(),
+            kind: PublicTrade {
+                id: exchange_time.timestamp_millis().to_string(),
+                price,
+                amount,
+                side,
+            },
+        })
+    };
 
-    Ok(MarketEvent {
-        time_exchange: exchange_time,
-        time_received,
-        exchange: exchange_id,
-        instrument,
-        kind: PublicTrade {
-            id: deal_item.time.to_string(),
-            price,
-            amount,
-            side,
-        },
-    })
-}
-
-// Helper function to map proto::PublicAggreDealsV3ApiItem to MarketEvent<PublicTrade>
-fn map_public_aggre_deals_item_to_market_event<InstrumentKey: Clone>(
-    exchange_id: ExchangeId,
-    instrument: InstrumentKey,
-    deal_item: &proto::PublicAggreDealsV3ApiItem,
-    time_received: DateTime<Utc>,
-) -> Result<MarketEvent<InstrumentKey, PublicTrade>, DataError> {
-    let price = deal_item.price.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!(
-            "Failed to parse price from MEXC aggregated deal: '{}', error: {}",
-            deal_item.price, e
-        ))
-    })?;
-    let amount = deal_item.quantity.parse::<f64>().map_err(|e| {
-        DataError::Socket(format!(
-            "Failed to parse quantity from MEXC aggregated deal: '{}', error: {}",
-            deal_item.quantity, e
-        ))
-    })?;
-    let side = mexc_trade_type_to_side(deal_item.trade_type)?;
-    let exchange_time = ms_epoch_to_datetime_utc(deal_item.time)?;
-
-    Ok(MarketEvent {
-        time_exchange: exchange_time,
-        time_received,
-        exchange: exchange_id,
-        instrument,
-        kind: PublicTrade {
-            id: deal_item.time.to_string(),
-            price,
-            amount,
-            side,
-        },
-    })
+    vec![
+        parse(&ticker.bid_price, &ticker.bid_quantity, Side::Buy),
+        parse(&ticker.ask_price, &ticker.ask_quantity, Side::Sell),
+    ]
 }
 
 #[cfg(test)]
@@ -178,20 +127,7 @@ mod tests {
 
     impl Identifier<String> for TestInstrument {
         fn id(&self) -> String {
-            format!("{}_{}", self.base, self.quote)
-        }
-    }
-
-    #[test]
-    fn test_mexc_trade_type_to_side_conversion() {
-        assert_eq!(mexc_trade_type_to_side(1), Ok(Side::Buy));
-        assert_eq!(mexc_trade_type_to_side(2), Ok(Side::Sell));
-        match mexc_trade_type_to_side(0) {
-            Err(DataError::Socket(s)) => {
-                assert!(s.contains("Unsupported MexcTrade::Side"));
-                assert!(s.contains("unknown trade_type: 0"));
-            }
-            other => panic!("Expected DataError::Socket(String), got {:?}", other),
+            format!("{}{}", self.base, self.quote)
         }
     }
 
@@ -225,12 +161,12 @@ mod tests {
     }
 
     #[test]
-    fn test_public_aggre_deals_item_to_market_event() {
-        let deal_item = proto::PublicAggreDealsV3ApiItem {
-            price: "50000.50".to_string(),
-            quantity: "0.001".to_string(),
-            trade_type: 1, // Buy
-            time: 1609459200123,
+    fn test_public_aggre_book_ticker_to_market_event() {
+        let ticker = proto::PublicAggreBookTickerV3Api {
+            bid_price: "50000.50".to_string(),
+            bid_quantity: "0.001".to_string(),
+            ask_price: "50001.0".to_string(),
+            ask_quantity: "0.002".to_string(),
         };
 
         let instrument = TestInstrument {
@@ -239,86 +175,81 @@ mod tests {
         };
         let time_received = Utc::now();
 
-        let event = map_public_aggre_deals_item_to_market_event(
+        let events = map_public_aggre_book_ticker_to_market_events(
             ExchangeId::Mexc,
             instrument.clone(),
-            &deal_item,
+            &ticker,
             time_received,
-        )
-        .unwrap();
-
-        assert_eq!(event.exchange, ExchangeId::Mexc);
-        assert_eq!(event.instrument.id(), "BTC_USDT".to_string());
-        assert_eq!(event.kind.price, 50000.50);
-
-        // Test parsing failure for price
-        let deal_item_bad_price = proto::PublicAggreDealsV3ApiItem {
-            price: "not_a_float".to_string(),
-            quantity: "0.001".to_string(),
-            trade_type: 1,
-            time: 1609459200123,
-        };
-        let result_bad_price = map_public_aggre_deals_item_to_market_event(
-            ExchangeId::Mexc,
-            instrument.clone(),
-            &deal_item_bad_price,
             time_received,
         );
-        assert!(matches!(result_bad_price, Err(DataError::Socket(_))));
-        if let Err(DataError::Socket(s)) = result_bad_price {
+
+        assert_eq!(events.len(), 2);
+        let event0 = events[0].as_ref().unwrap();
+        assert_eq!(event0.exchange, ExchangeId::Mexc);
+        assert_eq!(event0.instrument.id(), "BTCUSDT".to_string());
+        assert_eq!(event0.kind.price, 50000.50);
+
+        // Test parsing failure for price
+        let ticker_bad_price = proto::PublicAggreBookTickerV3Api {
+            bid_price: "not_a_float".to_string(),
+            bid_quantity: "0.001".to_string(),
+            ask_price: "50001.0".to_string(),
+            ask_quantity: "0.002".to_string(),
+        };
+        let result_bad_price = map_public_aggre_book_ticker_to_market_events(
+            ExchangeId::Mexc,
+            instrument.clone(),
+            &ticker_bad_price,
+            time_received,
+            time_received,
+        );
+        assert!(matches!(result_bad_price[0], Err(DataError::Socket(_))));
+        if let Err(DataError::Socket(s)) = &result_bad_price[0] {
             assert!(s.contains("Failed to parse price"));
         }
 
         // Test parsing failure for quantity
-        let deal_item_bad_quantity = proto::PublicAggreDealsV3ApiItem {
-            price: "50000.50".to_string(),
-            quantity: "not_a_float".to_string(),
-            trade_type: 1,
-            time: 1609459200123,
+        let ticker_bad_quantity = proto::PublicAggreBookTickerV3Api {
+            bid_price: "50000.50".to_string(),
+            bid_quantity: "not_a_float".to_string(),
+            ask_price: "50001.0".to_string(),
+            ask_quantity: "0.002".to_string(),
         };
-        let result_bad_quantity = map_public_aggre_deals_item_to_market_event(
+        let result_bad_quantity = map_public_aggre_book_ticker_to_market_events(
             ExchangeId::Mexc,
             instrument.clone(),
-            &deal_item_bad_quantity,
+            &ticker_bad_quantity,
+            time_received,
             time_received,
         );
-        assert!(matches!(result_bad_quantity, Err(DataError::Socket(_))));
-        if let Err(DataError::Socket(s)) = result_bad_quantity {
+        assert!(matches!(result_bad_quantity[0], Err(DataError::Socket(_))));
+        if let Err(DataError::Socket(s)) = &result_bad_quantity[0] {
             assert!(s.contains("Failed to parse quantity"));
         }
     }
 
     #[test]
-    fn test_transform_push_data_v3_api_wrapper_public_aggre_deals() {
+    fn test_transform_push_data_v3_api_wrapper_public_aggre_book_ticker() {
         let instrument = TestInstrument {
             base: "ETH".into(),
             quote: "USDT".into(),
         };
-        let deal_item1 = proto::PublicAggreDealsV3ApiItem {
-            price: "3000.1".to_string(),
-            quantity: "0.1".to_string(),
-            trade_type: 2, // Sell
-            time: 1609459300000,
-        };
-        let deal_item2 = proto::PublicAggreDealsV3ApiItem {
-            price: "3000.0".to_string(),
-            quantity: "0.05".to_string(),
-            trade_type: 1, // Buy
-            time: 1609459300100,
+        let ticker = proto::PublicAggreBookTickerV3Api {
+            bid_price: "3000.1".to_string(),
+            bid_quantity: "0.1".to_string(),
+            ask_price: "3000.2".to_string(),
+            ask_quantity: "0.05".to_string(),
         };
 
         let wrapper = proto::PushDataV3ApiWrapper {
-            channel: "spot@public.aggre.deals.v3.api.pb@100ms@ETH_USDT".to_string(),
-            symbol: Some("ETH_USDT".to_string()),
-            symbol_id: Some("ETH_USDT_ID".to_string()),
+            channel: "spot@public.aggre.bookTicker.v3.api.pb@100ms@ETHUSDT".to_string(),
+            symbol: Some("ETHUSDT".to_string()),
+            symbol_id: Some("ETHUSDT_ID".to_string()),
             create_time: Some(1609459300200),
             send_time: Some(1609459300250),
-            body: Some(proto::push_data_v3_api_wrapper::Body::PublicAggreDeals(
-                proto::PublicAggreDealsV3Api {
-                    deals: vec![deal_item1.clone(), deal_item2.clone()],
-                    event_type: "DEALS".to_string(),
-                },
-            )),
+            body: Some(
+                proto::push_data_v3_api_wrapper::Body::PublicAggreBookTicker(ticker.clone()),
+            ),
         };
 
         let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((
@@ -333,49 +264,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].kind.side, Side::Sell);
-        assert_eq!(events[1].kind.side, Side::Buy);
-    }
-
-    #[test]
-    fn test_transform_push_data_v3_api_wrapper_public_deals() {
-        let instrument = TestInstrument {
-            base: "LTC".into(),
-            quote: "USDT".into(),
-        };
-        let deal_item = proto::PublicDealsV3ApiItem {
-            price: "150.5".to_string(),
-            quantity: "1.2".to_string(),
-            trade_type: 1, // Buy
-            time: 1609459400000,
-        };
-        let wrapper = proto::PushDataV3ApiWrapper {
-            channel: "spot@public.deals.v3.api.pb@LTC_USDT".to_string(),
-            symbol: Some("LTC_USDT".to_string()),
-            symbol_id: Some("LTC_USDT_ID".to_string()),
-            create_time: Some(1609459400100),
-            send_time: Some(1609459400150),
-            body: Some(proto::push_data_v3_api_wrapper::Body::PublicDeals(
-                proto::PublicDealsV3Api {
-                    deals: vec![deal_item.clone()],
-                    event_type: "DEALS".to_string(),
-                },
-            )),
-        };
-
-        let market_iter = MarketIter::<TestInstrument, PublicTrade>::from((
-            ExchangeId::Mexc,
-            instrument.clone(),
-            wrapper,
-        ));
-        let events: Vec<_> = market_iter
-            .0
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].kind.price, 150.5);
+        assert_eq!(events[0].kind.side, Side::Buy);
+        assert_eq!(events[1].kind.side, Side::Sell);
     }
 
     #[test]
@@ -386,8 +276,8 @@ mod tests {
         };
         let wrapper = proto::PushDataV3ApiWrapper {
             channel: "some_channel".to_string(),
-            symbol: Some("BTC_USDT".to_string()),
-            symbol_id: Some("BTC_USDT_ID".to_string()),
+            symbol: Some("BTCUSDT".to_string()),
+            symbol_id: Some("BTCUSDT_ID".to_string()),
             create_time: Some(1609459200000),
             send_time: Some(1609459200000),
             body: None,
@@ -423,9 +313,9 @@ mod tests {
             window_end: 1609459260,
         };
         let wrapper = proto::PushDataV3ApiWrapper {
-            channel: "spot@public.kline.v3.api@Min1@BTC_USDT".to_string(),
-            symbol: Some("BTC_USDT".to_string()),
-            symbol_id: Some("BTC_USDT_ID".to_string()),
+            channel: "spot@public.kline.v3.api@Min1@BTCUSDT".to_string(),
+            symbol: Some("BTCUSDT".to_string()),
+            symbol_id: Some("BTCUSDT_ID".to_string()),
             create_time: Some(1609459260000),
             send_time: Some(1609459260000),
             body: Some(proto::push_data_v3_api_wrapper::Body::PublicSpotKline(
