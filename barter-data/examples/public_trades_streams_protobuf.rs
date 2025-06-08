@@ -1,9 +1,7 @@
 use barter_data::{
-    exchange::mexc::Mexc,
-    streams::{Streams, reconnect::stream::ReconnectingStream},
-    subscription::{book::OrderBooksL1, trade::PublicTrades},
+    event::DataKind, exchange::mexc::Mexc, streams::{consumer::MarketStreamResult, reconnect::stream::ReconnectingStream, Streams}, subscription::{book::OrderBooksL1, trade::PublicTrades}
 };
-use barter_instrument::instrument::market_data::kind::MarketDataInstrumentKind;
+use barter_instrument::instrument::market_data::{kind::MarketDataInstrumentKind, MarketDataInstrument};
 use futures_util::StreamExt;
 use tracing::{info, warn};
 
@@ -12,7 +10,8 @@ use tracing::{info, warn};
 async fn main() {
     init_logging();
 
-    let streams = Streams::builder_multi()
+    let streams: Streams<MarketStreamResult<MarketDataInstrument, DataKind>> =
+        Streams::builder_multi()
         .add(
             Streams::<PublicTrades>::builder().subscribe([
                 (Mexc, "eth", "usdt", MarketDataInstrumentKind::Spot, PublicTrades),
@@ -42,7 +41,7 @@ fn init_logging() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::filter::EnvFilter::builder()
-                .with_default_directive(tracing_subscriber::filter::LevelFilter::DEBUG.into())
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
         .with_ansi(cfg!(debug_assertions))

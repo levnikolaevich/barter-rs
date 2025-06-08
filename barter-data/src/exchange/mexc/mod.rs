@@ -118,8 +118,8 @@ impl Connector for Mexc {
         }
     }
 
-    fn expected_responses<InstrumentKey>(subscriptions: &Map<InstrumentKey>) -> usize {
-        subscriptions.0.len()
+    fn expected_responses<InstrumentKey>(_: &Map<InstrumentKey>) -> usize {
+        1
     }
 }
 
