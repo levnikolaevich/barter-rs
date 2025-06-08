@@ -1,7 +1,7 @@
 use barter_data::{
     exchange::mexc::Mexc,
     streams::{Streams, reconnect::stream::ReconnectingStream},
-    subscription::trade::PublicTrades,
+    subscription::{book::OrderBooksL1, trade::PublicTrades},
 };
 use barter_instrument::instrument::market_data::kind::MarketDataInstrumentKind;
 use futures_util::StreamExt;
@@ -12,10 +12,19 @@ use tracing::{info, warn};
 async fn main() {
     init_logging();
 
-    let streams = Streams::<PublicTrades>::builder()
-        .subscribe([
-            (Mexc, "eth", "usdt", MarketDataInstrumentKind::Spot, PublicTrades),
-        ])
+    let streams = Streams::builder_multi()
+        .add(
+            Streams::<PublicTrades>::builder().subscribe([
+                (Mexc, "eth", "usdt", MarketDataInstrumentKind::Spot, PublicTrades),
+                (Mexc, "btc", "usdt", MarketDataInstrumentKind::Spot, PublicTrades),
+            ]),
+        )
+        .add(
+            Streams::<OrderBooksL1>::builder().subscribe([
+                (Mexc, "eth", "usdt", MarketDataInstrumentKind::Spot, OrderBooksL1),
+                (Mexc, "btc", "usdt", MarketDataInstrumentKind::Spot, OrderBooksL1),
+            ]),
+        )
         .init()
         .await
         .unwrap();

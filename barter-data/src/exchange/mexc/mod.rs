@@ -9,7 +9,7 @@ use crate::{
     exchange::{Connector, ExchangeSub, PingInterval, StreamSelector},
     instrument::InstrumentData,
     subscriber::WebSocketSubscriber,
-    subscription::{Map, trade::PublicTrades},
+    subscription::{Map, book::OrderBooksL1, trade::PublicTrades},
     transformer::stateless::StatelessTransformer,
 };
 use barter_instrument::exchange::ExchangeId;
@@ -25,6 +25,7 @@ use std::{
 };
 use url::Url;
 
+pub mod book;
 pub mod channel;
 pub mod market;
 pub mod subscription;
@@ -169,6 +170,21 @@ where
             Self,
             Instrument::Key,
             PublicTrades,
+            self::trade::proto::PushDataV3ApiWrapper,
+        >,
+    >;
+}
+
+impl<Instrument> StreamSelector<Instrument, OrderBooksL1> for Mexc
+where
+    Instrument: InstrumentData,
+{
+    type SnapFetcher = NoInitialSnapshots;
+    type Stream = ExchangeWsPbStream<
+        StatelessTransformer<
+            Self,
+            Instrument::Key,
+            OrderBooksL1,
             self::trade::proto::PushDataV3ApiWrapper,
         >,
     >;

@@ -47,6 +47,15 @@ where
 
         if let Some(body) = wrapper.body {
             match body {
+                proto::push_data_v3_api_wrapper::Body::PublicAggreDeals(deals) => {
+                    let events = map_public_aggre_deals_to_market_events(
+                        exchange_id,
+                        instrument.clone(),
+                        &deals,
+                        time_received,
+                    );
+                    market_events.extend(events);
+                }
                 proto::push_data_v3_api_wrapper::Body::PublicAggreBookTicker(book_ticker) => {
                     let exchange_time = wrapper
                         .send_time
@@ -109,6 +118,57 @@ fn map_public_aggre_book_ticker_to_market_events<InstrumentKey: Clone>(
         parse(&ticker.bid_price, &ticker.bid_quantity, Side::Buy),
         parse(&ticker.ask_price, &ticker.ask_quantity, Side::Sell),
     ]
+}
+
+// Helper to map proto::PublicAggreDealsV3Api to MarketEvent<PublicTrade> instances
+fn map_public_aggre_deals_to_market_events<InstrumentKey: Clone>(
+    exchange_id: ExchangeId,
+    instrument: InstrumentKey,
+    deals: &proto::PublicAggreDealsV3Api,
+    time_received: DateTime<Utc>,
+) -> Vec<Result<MarketEvent<InstrumentKey, PublicTrade>, DataError>> {
+    deals
+        .deals
+        .iter()
+        .map(|deal| {
+            let price = deal.price.parse::<f64>().map_err(|e| {
+                DataError::Socket(format!(
+                    "Failed to parse price from MEXC agg deal: '{}', error: {}",
+                    deal.price, e
+                ))
+            })?;
+            let amount = deal.quantity.parse::<f64>().map_err(|e| {
+                DataError::Socket(format!(
+                    "Failed to parse quantity from MEXC agg deal: '{}', error: {}",
+                    deal.quantity, e
+                ))
+            })?;
+            let side = match deal.trade_type {
+                1 => Side::Buy,
+                2 => Side::Sell,
+                s => {
+                    return Err(DataError::Socket(format!(
+                        "Unsupported trade_type for MEXC agg deal: {}",
+                        s
+                    )));
+                }
+            };
+            let exchange_time = ms_epoch_to_datetime_utc(deal.time)?;
+
+            Ok(MarketEvent {
+                time_exchange: exchange_time,
+                time_received,
+                exchange: exchange_id,
+                instrument: instrument.clone(),
+                kind: PublicTrade {
+                    id: exchange_time.timestamp_millis().to_string(),
+                    price,
+                    amount,
+                    side,
+                },
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
