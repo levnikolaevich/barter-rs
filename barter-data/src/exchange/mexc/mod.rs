@@ -141,9 +141,23 @@ impl<'de> Deserialize<'de> for self::trade::proto::PushDataV3ApiWrapper {
 
 impl Identifier<Option<SubscriptionId>> for self::trade::proto::PushDataV3ApiWrapper {
     fn id(&self) -> Option<SubscriptionId> {
-        // Use the raw channel string as the subscription identifier.
-        // This may be adjusted once a dedicated Protobuf parser is implemented.
-        Some(SubscriptionId::from(self.channel.as_str()))
+        // Messages are tagged with a `channel` containing the base topic,
+        // interval and symbol (eg. `spot@public.aggre.bookTicker.v3.api.pb@100ms@ETHUSDT`).
+        // `SubscriptionId`s for `Mexc` streams are stored as
+        // `"{base_channel}|{symbol}"`, so we parse the parts here to match.
+        let mut parts = self.channel.rsplitn(3, '@');
+
+        let symbol_from_channel = parts.next();
+        let _interval = parts.next();
+        let base_channel = parts.next();
+
+        match (symbol_from_channel, base_channel) {
+            (Some(symbol), Some(base)) => {
+                let symbol = self.symbol.as_deref().unwrap_or(symbol);
+                Some(SubscriptionId::from(format!("{base}|{symbol}")))
+            }
+            _ => Some(SubscriptionId::from(self.channel.as_str())),
+        }
     }
 }
 
