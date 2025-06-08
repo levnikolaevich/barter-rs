@@ -311,7 +311,7 @@ mod tests {
                         ]),
                         id: 123, // Adding an ID for unsubscription
                     },
-                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT"]}"#,
+                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT"],"id":123}"#,
                 },
                 TestCase {
                     name: "TC1: Multiple subscriptions",
@@ -323,7 +323,7 @@ mod tests {
                         ]),
                         id: 123, // Adding an ID for unsubscription
                     },
-                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT","spot@public.aggre.bookTicker.v3.api.pb@10ms@ETHUSDT"]}"#,
+                    expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT","spot@public.aggre.bookTicker.v3.api.pb@10ms@ETHUSDT"],"id":123}"#,
                 },
                 TestCase {
                     name: "TC2: Unsubscription",
@@ -334,7 +334,7 @@ mod tests {
                         ]),
                         id: 123, // Adding an ID for unsubscription
                     },
-                    expected_json: r#"{"method":"UNSUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@LTCUSDT"]}"#,
+                    expected_json: r#"{"method":"UNSUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@LTCUSDT"],"id":123}"#,
                 },
             ];
 
