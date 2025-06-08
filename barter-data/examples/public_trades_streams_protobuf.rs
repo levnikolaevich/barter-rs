@@ -1,7 +1,12 @@
 use barter_data::{
-    event::DataKind, exchange::mexc::Mexc, streams::{consumer::MarketStreamResult, reconnect::stream::ReconnectingStream, Streams}, subscription::{book::OrderBooksL1, trade::PublicTrades}
+    event::DataKind,
+    exchange::mexc::Mexc,
+    streams::{Streams, consumer::MarketStreamResult, reconnect::stream::ReconnectingStream},
+    subscription::{book::OrderBooksL1, trade::PublicTrades},
 };
-use barter_instrument::instrument::market_data::{kind::MarketDataInstrumentKind, MarketDataInstrument};
+use barter_instrument::instrument::market_data::{
+    MarketDataInstrument, kind::MarketDataInstrumentKind,
+};
 use futures_util::StreamExt;
 use tracing::{info, warn};
 
