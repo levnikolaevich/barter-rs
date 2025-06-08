@@ -19,7 +19,7 @@ use barter_macro::{DeExchange, SerExchange};
 use derive_more::Display;
 use serde::Deserialize;
 use serde_json::json;
-use std::{borrow::Cow, time::Duration};
+use std::{borrow::Cow, time::{Duration, SystemTime, UNIX_EPOCH}};
 use tokio::time;
 use url::Url;
 
@@ -30,7 +30,7 @@ pub mod trade;
 
 /// MEXC WebSocket API base URL for public market data streams (Secure).
 /// Docs: <https://mexcdevelop.github.io/apidocs/spot_v3_en/#websocket-market-data>
-pub const BASE_URL_MEXC: &str = "wss://wbs.mexc.com/ws";
+pub const BASE_URL_MEXC: &str = "wss://wbs-api.mexc.com/ws";
 
 /// [`Mexc`] exchange connector definition.
 ///
@@ -73,13 +73,7 @@ impl Connector for Mexc {
     }
 
     fn ping_interval() -> Option<PingInterval> {
-        Some(PingInterval {
-            interval: time::interval(Duration::from_secs(10)),
-            // MEXC expects an uppercase "PING" method per the API docs.
-            // Using lowercase may lead to the server closing the connection
-            // after ~30s of inactivity.
-            ping: || WsMessage::Text(json!({ "method": "PING" }).to_string().into()),
-        })
+            None
     }
 
     fn requests(exchange_subs: Vec<ExchangeSub<Self::Channel, Self::Market>>) -> Vec<WsMessage> {
@@ -100,9 +94,15 @@ impl Connector for Mexc {
             })
             .collect::<Vec<String>>();
 
+        let request_id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
         let subscription_message = MexcWsSub {
             method: MexcWsMethod::Subscription,
             params: Cow::Owned(topics),
+            id: request_id,     
         };
 
         match serde_json::to_string(&subscription_message) {

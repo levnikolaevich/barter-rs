@@ -35,6 +35,7 @@ pub struct MexcWsSub<'a> {
     pub method: MexcWsMethod,
     #[serde(rename = "params")]
     pub params: Cow<'a, [String]>, // List of topic strings
+    pub id: u64,
 }
 
 /// Inbound WebSocket message received from MEXC in response to a subscription or unsubscription attempt.
@@ -308,6 +309,7 @@ mod tests {
                         params: Cow::Owned(vec![
                             "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".to_string(),
                         ]),
+                        id: 123, // Adding an ID for unsubscription
                     },
                     expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT"]}"#,
                 },
@@ -319,6 +321,7 @@ mod tests {
                             "spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT".to_string(),
                             "spot@public.aggre.bookTicker.v3.api.pb@10ms@ETHUSDT".to_string(),
                         ]),
+                        id: 123, // Adding an ID for unsubscription
                     },
                     expected_json: r#"{"method":"SUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@BTCUSDT","spot@public.aggre.bookTicker.v3.api.pb@10ms@ETHUSDT"]}"#,
                 },
@@ -329,6 +332,7 @@ mod tests {
                         params: Cow::Owned(vec![
                             "spot@public.aggre.bookTicker.v3.api.pb@100ms@LTCUSDT".to_string(),
                         ]),
+                        id: 123, // Adding an ID for unsubscription
                     },
                     expected_json: r#"{"method":"UNSUBSCRIPTION","params":["spot@public.aggre.bookTicker.v3.api.pb@100ms@LTCUSDT"]}"#,
                 },
