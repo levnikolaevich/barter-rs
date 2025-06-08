@@ -15,6 +15,8 @@ use tracing::{info, warn};
 async fn main() {
     init_logging();
 
+    // Initialise PublicTrades & OrderBooksL1 Streams for Mexc
+    // '--> each call to StreamBuilder::subscribe() creates a separate WebSocket connection
     let streams: Streams<MarketStreamResult<MarketDataInstrument, DataKind>> =
         Streams::builder_multi()
         .add(
@@ -33,6 +35,8 @@ async fn main() {
         .await
         .unwrap();
 
+    // Select and merge every exchange Stream using futures_util::stream::select_all
+    // Note: use `Streams.select(ExchangeId)` to interact with individual exchange streams!
     let mut joined_stream = streams
         .select_all()
         .with_error_handler(|error| warn!(?error, "MarketStream generated error"));
