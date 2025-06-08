@@ -1,7 +1,7 @@
 use super::Mexc;
 use crate::{
     Identifier,
-    subscription::{Subscription, trade::PublicTrades},
+    subscription::{Subscription, book::OrderBooksL1, trade::PublicTrades},
 };
 use serde::Serialize;
 
@@ -30,12 +30,21 @@ impl MexcChannel {
     ///
     /// Example base string: "spot@public.aggre.bookTicker.v3.api.pb"
     pub const AGGREGATED_BOOK_TICKER_PB: Self = Self("spot@public.aggre.bookTicker.v3.api.pb");
+    /// Base channel string for [`Mexc`]'s aggregated deals stream.
+    ///
+    /// Used for [`PublicTrades`] subscriptions.
+    pub const AGGREGATED_DEALS_PB: Self = Self("spot@public.aggre.deals.v3.api.pb");
 }
 
 impl<Instrument> Identifier<MexcChannel> for Subscription<Mexc, Instrument, PublicTrades> {
     fn id(&self) -> MexcChannel {
-        // Default to using aggregated book ticker in Protobuf format.
-        // The choice of interval (100ms/10ms) will be handled in the subscription logic.
+        // Use the aggregated deals stream for public trades.
+        MexcChannel::AGGREGATED_DEALS_PB
+    }
+}
+
+impl<Instrument> Identifier<MexcChannel> for Subscription<Mexc, Instrument, OrderBooksL1> {
+    fn id(&self) -> MexcChannel {
         MexcChannel::AGGREGATED_BOOK_TICKER_PB
     }
 }
