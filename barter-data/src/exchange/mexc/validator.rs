@@ -27,7 +27,7 @@ impl SubscriptionValidator for MexcWebSocketSubValidator {
     type Parser = WebSocketParser;
 
     async fn validate<Exchange, Instrument, Kind>(
-        mut instrument_map: Map<Instrument>,
+        instrument_map: Map<Instrument>,
         websocket: &mut WebSocket,
     ) -> Result<(Map<Instrument>, Vec<WsMessage>), SocketError>
     where
