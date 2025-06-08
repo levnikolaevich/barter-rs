@@ -19,12 +19,10 @@ use barter_integration::{
 use barter_macro::{DeExchange, SerExchange};
 use derive_more::Display;
 use serde::Deserialize;
-use serde_json::json;
 use std::{
     borrow::Cow,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
-use tokio::time;
 use url::Url;
 
 pub mod channel;
