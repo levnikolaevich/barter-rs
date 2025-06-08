@@ -1,15 +1,23 @@
 use barter_data::{
-    event::DataKind, exchange::mexc::Mexc, streams::{consumer::MarketStreamResult, reconnect::stream::ReconnectingStream, Streams}, subscription::{book::OrderBooksL1, trade::PublicTrades}
+    event::DataKind,
+    exchange::mexc::Mexc,
+    streams::{Streams, consumer::MarketStreamResult, reconnect::stream::ReconnectingStream},
+    subscription::{book::OrderBooksL1, trade::PublicTrades},
 };
-use barter_instrument::instrument::market_data::{kind::MarketDataInstrumentKind, MarketDataInstrument};
+use barter_instrument::instrument::market_data::{
+    MarketDataInstrument, kind::MarketDataInstrumentKind,
+};
 use futures_util::StreamExt;
 use tracing::{info, warn};
 
 #[rustfmt::skip]
 #[tokio::main]
 async fn main() {
+    // Initialise INFO Tracing log subscriber
     init_logging();
 
+    // Initialise PublicTrades & OrderBooksL1 Streams for Mexc
+    // '--> each call to StreamBuilder::subscribe() creates a separate WebSocket connection
     let streams: Streams<MarketStreamResult<MarketDataInstrument, DataKind>> =
         Streams::builder_multi()
         .add(
@@ -28,6 +36,8 @@ async fn main() {
         .await
         .unwrap();
 
+    // Select and merge every exchange Stream using futures_util::stream::select_all
+    // Note: use `Streams.select(ExchangeId)` to interact with individual exchange streams!
     let mut joined_stream = streams
         .select_all()
         .with_error_handler(|error| warn!(?error, "MarketStream generated error"));
