@@ -2,12 +2,13 @@ use self::{
     channel::MexcChannel,
     market::MexcMarket,
     subscription::{MexcAggInterval, MexcWsMethod, MexcWsSub},
+    validator::MexcWebSocketSubValidator,
 };
 use crate::{
     ExchangeWsPbStream, Identifier, NoInitialSnapshots,
     exchange::{Connector, ExchangeSub, PingInterval, StreamSelector},
     instrument::InstrumentData,
-    subscriber::{WebSocketSubscriber, validator::WebSocketSubValidator},
+    subscriber::WebSocketSubscriber,
     subscription::{Map, trade::PublicTrades},
     transformer::stateless::StatelessTransformer,
 };
@@ -19,7 +20,10 @@ use barter_macro::{DeExchange, SerExchange};
 use derive_more::Display;
 use serde::Deserialize;
 use serde_json::json;
-use std::{borrow::Cow, time::{Duration, SystemTime, UNIX_EPOCH}};
+use std::{
+    borrow::Cow,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::time;
 use url::Url;
 
@@ -27,6 +31,7 @@ pub mod channel;
 pub mod market;
 pub mod subscription;
 pub mod trade;
+pub mod validator;
 
 /// MEXC WebSocket API base URL for public market data streams (Secure).
 /// Docs: <https://mexcdevelop.github.io/apidocs/spot_v3_en/#websocket-market-data>
@@ -65,7 +70,7 @@ impl Connector for Mexc {
     type Channel = MexcChannel;
     type Market = MexcMarket;
     type Subscriber = WebSocketSubscriber;
-    type SubValidator = WebSocketSubValidator;
+    type SubValidator = MexcWebSocketSubValidator;
     type SubResponse = self::subscription::MexcSubResponse;
 
     fn url() -> Result<Url, SocketError> {
@@ -73,7 +78,7 @@ impl Connector for Mexc {
     }
 
     fn ping_interval() -> Option<PingInterval> {
-            None
+        None
     }
 
     fn requests(exchange_subs: Vec<ExchangeSub<Self::Channel, Self::Market>>) -> Vec<WsMessage> {
@@ -102,7 +107,7 @@ impl Connector for Mexc {
         let subscription_message = MexcWsSub {
             method: MexcWsMethod::Subscription,
             params: Cow::Owned(topics),
-            id: request_id,     
+            id: request_id,
         };
 
         match serde_json::to_string(&subscription_message) {
